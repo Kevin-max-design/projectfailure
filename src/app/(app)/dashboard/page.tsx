@@ -18,33 +18,115 @@ import AppShell from '@/components/layout/AppShell';
 import { mockDb, DEMO_PATIENT } from '@/lib/supabase/service';
 import { formatDate } from '@/lib/utils';
 import { BRAND_CONFIG } from '@/config/brand';
+import { isDemoMode } from '@/lib/mode';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [patient, setPatient] = useState<any>(null);
   const [recentEvents, setRecentEvents] = useState<any[]>([]);
   const [documentsNeedingReview, setDocumentsNeedingReview] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Read user/patient profile from localStorage / mockDb
-    if (typeof window !== 'undefined') {
-      const storedProfile = localStorage.getItem('medmemory_patient_profile');
-      if (storedProfile) {
-        setPatient(JSON.parse(storedProfile));
+    const loadDashboardData = async () => {
+      if (isDemoMode()) {
+        if (typeof window !== 'undefined') {
+          const storedProfile = localStorage.getItem('medmemory_patient_profile');
+          if (storedProfile) {
+            setPatient(JSON.parse(storedProfile));
+          } else {
+            setPatient(DEMO_PATIENT);
+          }
+
+          // Load medical events sorted by date desc
+          const eventsRes = mockDb.query('medical_events').select().order('event_date', { ascending: false });
+          setRecentEvents(eventsRes.data.slice(0, 4));
+
+          // Load documents needing review
+          const docsRes = mockDb.query('documents').select().eq('processing_status', 'awaiting_review');
+          setDocumentsNeedingReview(docsRes.data || []);
+        }
+        setLoading(false);
       } else {
-        setPatient(DEMO_PATIENT);
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+
+          // 1. Fetch patient profile
+          const { data: patientData, error: patientError } = await supabase
+            .from('patients')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+          if (patientError || !patientData) {
+            console.log('Patient profile not found in DB, redirecting to onboarding...');
+            router.push('/app/onboarding');
+            return;
+          }
+
+          const mappedPatient = {
+            id: patientData.id,
+            fullName: patientData.full_name,
+            dateOfBirth: patientData.date_of_birth,
+            gender: patientData.gender,
+            bloodGroup: patientData.blood_group,
+            phone: patientData.phone,
+            emergencyContactName: patientData.emergency_contact_name,
+            emergencyContactPhone: patientData.emergency_contact_phone,
+            knownAllergies: patientData.known_allergies || [],
+            knownChronicConditions: patientData.known_chronic_conditions || [],
+            currentLongTermMedications: patientData.current_long_term_medications || [],
+            createdAt: patientData.created_at,
+            updatedAt: patientData.updated_at
+          };
+          setPatient(mappedPatient);
+
+          // Update local storage so other components stay sync'd
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('medmemory_patient_id', patientData.id);
+            localStorage.setItem('medmemory_patient_name', patientData.full_name);
+            localStorage.setItem('medmemory_onboarded', 'true');
+          }
+
+          // 2. Load recent events from Supabase
+          const { data: eventsData } = await supabase
+            .from('medical_events')
+            .select('*')
+            .eq('patient_id', patientData.id)
+            .order('event_date', { ascending: false })
+            .limit(4);
+
+          setRecentEvents(eventsData || []);
+
+          // 3. Load documents needing review
+          const { data: docsData } = await supabase
+            .from('documents')
+            .select('*')
+            .eq('patient_id', patientData.id)
+            .eq('processing_status', 'awaiting_review');
+
+          setDocumentsNeedingReview(docsData || []);
+
+        } catch (err) {
+          console.error('Failed to load dashboard data:', err);
+        } finally {
+          setLoading(false);
+        }
       }
+    };
 
-      // Load medical events sorted by date desc
-      const eventsRes = mockDb.query('medical_events').select().order('event_date', { ascending: false });
-      setRecentEvents(eventsRes.data.slice(0, 4));
+    loadDashboardData();
+  }, [router]);
 
-      // Load documents needing review
-      const docsRes = mockDb.query('documents').select().eq('processing_status', 'awaiting_review');
-      setDocumentsNeedingReview(docsRes.data || []);
-    }
-  }, []);
-
-  if (!patient) {
+  if (loading || !patient) {
     return (
       <AppShell>
         <div className="flex items-center justify-center min-h-[400px]">
