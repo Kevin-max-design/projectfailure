@@ -67,6 +67,17 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleCompleteOnboarding = async () => {
+    if (!fullName.trim()) {
+      alert('Please enter your Full Name on Step 1.');
+      setStep(1);
+      return;
+    }
+    if (!dob) {
+      alert('Please select your Date of Birth on Step 1.');
+      setStep(1);
+      return;
+    }
+
     if (submitting) return;
     setSubmitting(true);
 
@@ -428,7 +439,19 @@ export default function OnboardingPage() {
 
           {step < 3 ? (
             <button
-              onClick={() => setStep(step + 1)}
+              onClick={() => {
+                if (step === 1) {
+                  if (!fullName.trim()) {
+                    alert('Please enter your Full Name.');
+                    return;
+                  }
+                  if (!dob) {
+                    alert('Please select your Date of Birth.');
+                    return;
+                  }
+                }
+                setStep(step + 1);
+              }}
               className="inline-flex items-center px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold transition-all shadow-md shadow-teal-500/10"
             >
               Next Step
