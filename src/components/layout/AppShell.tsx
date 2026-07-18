@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -29,6 +29,54 @@ export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [patientName, setPatientName] = useState('Patient');
+
+  useEffect(() => {
+    const fetchName = async () => {
+      if (isDemoMode()) {
+        if (typeof window !== 'undefined') {
+          const storedProfile = localStorage.getItem('medmemory_patient_profile');
+          if (storedProfile) {
+            try {
+              const parsed = JSON.parse(storedProfile);
+              if (parsed.fullName) setPatientName(parsed.fullName);
+            } catch {}
+          }
+        }
+      } else {
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: patient } = await supabase
+              .from('patients')
+              .select('full_name')
+              .eq('user_id', user.id)
+              .single();
+            if (patient?.full_name) {
+              setPatientName(patient.full_name);
+            } else if (user.user_metadata?.full_name) {
+              setPatientName(user.user_metadata.full_name);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching patient name for AppShell:', err);
+        }
+      }
+    };
+    fetchName();
+  }, []);
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .filter(Boolean)
+      .join('')
+      .substring(0, 2)
+      .toUpperCase() || 'P';
+  };
 
   const navigation = [
     { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
@@ -123,10 +171,10 @@ export default function AppShell({ children }: AppShellProps) {
             <div className="flex items-center w-full justify-between">
               <div className="flex items-center space-x-3">
                 <div className="h-9 w-9 rounded-full bg-[#ccfbf1] dark:bg-[#115e59] flex items-center justify-center font-bold text-[#0d9488] dark:text-[#14b8a6]">
-                  AR
+                  {getInitials(patientName)}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[#0f172a] dark:text-white">Arjun Rao</p>
+                  <p className="text-sm font-medium text-[#0f172a] dark:text-white max-w-[120px] truncate">{patientName}</p>
                   <p className="text-xs text-[#64748b]">Patient Profile</p>
                 </div>
               </div>
@@ -202,10 +250,10 @@ export default function AppShell({ children }: AppShellProps) {
             <div className="border-t border-[#e2e8f0] dark:border-[#334155] pt-4">
               <div className="flex items-center space-x-3 mb-4">
                 <div className="h-9 w-9 rounded-full bg-[#ccfbf1] dark:bg-[#115e59] flex items-center justify-center font-bold text-[#0d9488] dark:text-[#14b8a6]">
-                  AR
+                  {getInitials(patientName)}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[#0f172a] dark:text-white">Arjun Rao</p>
+                  <p className="text-sm font-medium text-[#0f172a] dark:text-white max-w-[120px] truncate">{patientName}</p>
                   <p className="text-xs text-[#64748b]">Patient Profile</p>
                 </div>
               </div>

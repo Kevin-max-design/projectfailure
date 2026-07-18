@@ -15,20 +15,69 @@ import {
 import AppShell from '@/components/layout/AppShell';
 import { DEMO_PATIENT } from '@/lib/extraction/demo-data';
 import { isDemoMode } from '@/lib/mode';
+import { useRouter } from 'next/navigation';
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [patient, setPatient] = useState<any>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedProfile = localStorage.getItem('medmemory_patient_profile');
-      if (storedProfile) {
-        setPatient(JSON.parse(storedProfile));
+    const loadProfile = async () => {
+      if (isDemoMode()) {
+        if (typeof window !== 'undefined') {
+          const storedProfile = localStorage.getItem('medmemory_patient_profile');
+          if (storedProfile) {
+            setPatient(JSON.parse(storedProfile));
+          } else {
+            setPatient(DEMO_PATIENT);
+          }
+        }
       } else {
-        setPatient(DEMO_PATIENT);
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+
+          const { data: patientData, error } = await supabase
+            .from('patients')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+
+          if (error || !patientData) {
+            console.log('No patient record found for user in profile page, redirecting...');
+            router.push('/app/onboarding');
+            return;
+          }
+
+          setPatient({
+            id: patientData.id,
+            fullName: patientData.full_name,
+            dateOfBirth: patientData.date_of_birth,
+            gender: patientData.gender,
+            bloodGroup: patientData.blood_group,
+            phone: patientData.phone,
+            emergencyContactName: patientData.emergency_contact_name,
+            emergencyContactPhone: patientData.emergency_contact_phone,
+            knownAllergies: patientData.known_allergies || [],
+            knownChronicConditions: patientData.known_chronic_conditions || [],
+            currentLongTermMedications: patientData.current_long_term_medications || [],
+            createdAt: patientData.created_at,
+            updatedAt: patientData.updated_at
+          });
+        } catch (err) {
+          console.error('Failed to load profile:', err);
+        }
       }
-    }
-  }, []);
+    };
+
+    loadProfile();
+  }, [router]);
 
   const handleExportData = () => {
     if (!patient) return;
