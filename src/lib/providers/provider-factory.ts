@@ -14,7 +14,8 @@ export function createOCRProvider(): OCRProvider {
   if (provider === 'openai') {
     const key = process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
     if (!key) {
-      throw new Error('API key is missing for OpenAI OCR provider in production mode.');
+      console.warn('API key is missing for OpenAI OCR provider. Falling back to DemoOCRProvider.');
+      return new DemoOCRProvider();
     }
     return new OpenAIOCRProvider();
   }
@@ -29,7 +30,8 @@ export function createExtractionProvider(): MedicalExtractionProvider {
   if (provider === 'openai') {
     const key = process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
     if (!key) {
-      throw new Error('API key is missing for OpenAI Medical Extraction provider in production mode.');
+      console.warn('API key is missing for OpenAI Medical Extraction provider. Falling back to DemoMedicalExtractionProvider.');
+      return new DemoMedicalExtractionProvider();
     }
     return new OpenAIExtractionProvider();
   }
@@ -42,7 +44,8 @@ export function createQAProvider(): QuestionAnsweringProvider {
   }
   const key = process.env.AI_API_KEY || process.env.OPENAI_API_KEY;
   if (!key) {
-    throw new Error('API key is missing for OpenAI Question Answering provider in production mode.');
+    console.warn('API key is missing for OpenAI Question Answering provider. Falling back to DemoQuestionAnsweringProvider.');
+    return new DemoQuestionAnsweringProvider();
   }
   return new OpenAIQAProvider();
 }
