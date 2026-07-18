@@ -14,21 +14,21 @@ export default function OnboardingPage() {
   const [fullName, setFullName] = useState(
     typeof window !== 'undefined' ? localStorage.getItem('medmemory_patient_name') || '' : ''
   );
-  const [dob, setDob] = useState('1985-05-12');
-  const [gender, setGender] = useState('Male');
-  const [bloodGroup, setBloodGroup] = useState('O Positive');
-  const [phone, setPhone] = useState('+1 (555) 019-2834');
-  const [emergencyName, setEmergencyName] = useState('Priya Rao');
-  const [emergencyPhone, setEmergencyPhone] = useState('+1 (555) 019-2835');
+  const [dob, setDob] = useState(isDemoMode() ? '1985-05-12' : '');
+  const [gender, setGender] = useState(isDemoMode() ? 'Male' : 'Prefer not to say');
+  const [bloodGroup, setBloodGroup] = useState(isDemoMode() ? 'O Positive' : 'Unknown');
+  const [phone, setPhone] = useState(isDemoMode() ? '+1 (555) 019-2834' : '');
+  const [emergencyName, setEmergencyName] = useState(isDemoMode() ? 'Priya Rao' : '');
+  const [emergencyPhone, setEmergencyPhone] = useState(isDemoMode() ? '+1 (555) 019-2835' : '');
 
   // Multi-value list states
-  const [allergies, setAllergies] = useState<string[]>(['Penicillin']);
+  const [allergies, setAllergies] = useState<string[]>(isDemoMode() ? ['Penicillin'] : []);
   const [newAllergy, setNewAllergy] = useState('');
   
-  const [chronicConditions, setChronicConditions] = useState<string[]>(['Type 2 Diabetes Mellitus']);
+  const [chronicConditions, setChronicConditions] = useState<string[]>(isDemoMode() ? ['Type 2 Diabetes Mellitus'] : []);
   const [newCondition, setNewCondition] = useState('');
 
-  const [medications, setMedications] = useState<string[]>(['Metformin 500mg twice daily']);
+  const [medications, setMedications] = useState<string[]>(isDemoMode() ? ['Metformin 500mg twice daily'] : []);
   const [newMedication, setNewMedication] = useState('');
 
   const handleAddAllergy = () => {

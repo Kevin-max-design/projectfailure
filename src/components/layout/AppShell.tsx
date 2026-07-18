@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BRAND_CONFIG } from '@/config/brand';
+import { isDemoMode } from '@/lib/mode';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -40,11 +41,28 @@ export default function AppShell({ children }: AppShellProps) {
     { name: 'Profile / Settings', href: '/app/profile', icon: User },
   ];
 
-  const handleLogout = () => {
-    // Demo mode logout clearing
+  const handleLogout = async () => {
+    // Clear all client-side cached data
     if (typeof window !== 'undefined') {
       localStorage.removeItem('medmemory_logged_in');
+      localStorage.removeItem('medmemory_patient_id');
+      localStorage.removeItem('medmemory_patient_name');
+      localStorage.removeItem('medmemory_patient_email');
+      localStorage.removeItem('medmemory_onboarded');
+      localStorage.removeItem('medmemory_patient_profile');
+      localStorage.removeItem('medmemory_seeded');
     }
+
+    if (!isDemoMode()) {
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error('Error during sign out:', err);
+      }
+    }
+
     router.push('/login');
   };
 
