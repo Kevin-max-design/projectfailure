@@ -22,6 +22,201 @@ import { BRAND_CONFIG } from '@/config/brand';
 import { isDemoMode } from '@/lib/mode';
 import { useRouter } from 'next/navigation';
 
+// Inline premium SVG Sparkline/Trend Data Visualization
+const LabTrendChart = ({ trend }: { trend: any }) => {
+  const points = trend.points || [];
+  if (points.length === 0) return null;
+
+  const values = points.map((p: any) => parseFloat(p.value)).filter((v: number) => !isNaN(v));
+  if (values.length === 0) return null;
+
+  const maxVal = Math.max(...values);
+  const minVal = Math.min(...values);
+  const valRange = maxVal - minVal;
+  
+  // Scale scaling padding
+  const yPadding = valRange === 0 ? maxVal * 0.25 || 1 : valRange * 0.35;
+  const yMax = maxVal + yPadding;
+  const yMin = Math.max(0, minVal - yPadding);
+  const yRange = yMax - yMin || 1;
+
+  const width = 400;
+  const height = 90;
+  const paddingX = 30;
+  const paddingY = 15;
+
+  const chartWidth = width - paddingX * 2;
+  const chartHeight = height - paddingY * 2;
+
+  const svgPoints = points.map((pt: any, idx: number) => {
+    const x = paddingX + (idx / (points.length - 1 || 1)) * chartWidth;
+    const val = parseFloat(pt.value);
+    const y = paddingY + chartHeight - ((val - yMin) / yRange) * chartHeight;
+    return { x, y, value: val, date: pt.date, isAbnormal: pt.abnormalFlag || pt.isAbnormal };
+  });
+
+  const linePath = svgPoints.map((pt: any, idx: number) => 
+    `${idx === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`
+  ).join(' ');
+
+  const areaPath = points.length > 1
+    ? `${linePath} L ${svgPoints[svgPoints.length - 1].x} ${height - paddingY} L ${svgPoints[0].x} ${height - paddingY} Z`
+    : '';
+
+  return (
+    <div className="bg-slate-50/50 dark:bg-slate-950/20 rounded-xl p-3 border border-slate-100 dark:border-slate-855/50 relative overflow-hidden mt-1">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible">
+        <defs>
+          <linearGradient id={`grad-${trend.testName.replace(/\s+/g, '-')}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#0d9488" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#0d9488" stopOpacity="0.0" />
+          </linearGradient>
+        </defs>
+        
+        {/* Subtle Grid line (horizontal mid line) */}
+        <line 
+          x1={paddingX} 
+          y1={paddingY + chartHeight / 2} 
+          x2={width - paddingX} 
+          y2={paddingY + chartHeight / 2} 
+          className="stroke-slate-200/60 dark:stroke-slate-800/40" 
+          strokeWidth="0.75" 
+          strokeDasharray="3 3" 
+        />
+
+        {/* Area fill under curve */}
+        {points.length > 1 && (
+          <path d={areaPath} fill={`url(#grad-${trend.testName.replace(/\s+/g, '-')})`} />
+        )}
+
+        {/* Sparkline curve */}
+        {points.length > 1 ? (
+          <path 
+            d={linePath} 
+            fill="none" 
+            stroke="#0d9488" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+          />
+        ) : (
+          <line 
+            x1={paddingX} 
+            y1={svgPoints[0].y} 
+            x2={width - paddingX} 
+            y2={svgPoints[0].y} 
+            stroke="#0d9488" 
+            strokeWidth="1.5" 
+            strokeDasharray="2 2" 
+          />
+        )}
+
+        {/* Circles & Labels */}
+        {svgPoints.map((pt: any, idx: number) => (
+          <g key={idx}>
+            <circle 
+              cx={pt.x} 
+              cy={pt.y} 
+              r="4.5" 
+              fill="#ffffff" 
+              stroke={pt.isAbnormal ? '#ef4444' : '#0d9488'} 
+              strokeWidth="2" 
+            />
+            <text 
+              x={pt.x} 
+              y={pt.y - 8} 
+              textAnchor="middle" 
+              className="text-[9px] font-extrabold fill-slate-700 dark:fill-slate-350"
+            >
+              {pt.value}
+            </text>
+            <text 
+              x={pt.x} 
+              y={height - 2} 
+              textAnchor="middle" 
+              className="text-[8px] font-semibold fill-slate-400 dark:fill-slate-500"
+            >
+              {new Date(pt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+};
+
+// Animated Knowledge Graph Network Visualization
+const AIKnowledgeGraphVisualizer = ({ patientName, nodesCount, edgesCount }: { patientName: string, nodesCount: number, edgesCount: number }) => {
+  return (
+    <div className="bg-slate-50/50 dark:bg-slate-950/40 rounded-xl p-4 border border-slate-100 dark:border-slate-850/50 flex flex-col items-center justify-center space-y-3 relative overflow-hidden h-[230px] mt-1">
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#0f172a05_1px,transparent_1px),linear-gradient(to_bottom,#0f172a05_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#ffffff02_1px,transparent_1px),linear-gradient(to_bottom,#ffffff02_1px,transparent_1px)] bg-[size:10px_10px] opacity-40"></div>
+      
+      <svg className="w-full h-full min-h-[160px] overflow-visible" viewBox="0 0 400 180">
+        <style>{`
+          @keyframes dash {
+            to {
+              stroke-dashoffset: -20;
+            }
+          }
+        `}</style>
+
+        {/* Connections (Edges) with dash-array animation */}
+        <g stroke="#0d9488" strokeWidth="1.5" strokeOpacity="0.4">
+          <line x1="200" y1="90" x2="70" y2="40" style={{ strokeDasharray: '4 4', animation: 'dash 5s linear infinite' }} />
+          <line x1="200" y1="90" x2="100" y2="140" style={{ strokeDasharray: '4 4', animation: 'dash 6s linear infinite' }} />
+          <line x1="200" y1="90" x2="330" y2="50" style={{ strokeDasharray: '4 4', animation: 'dash 4s linear infinite' }} />
+          <line x1="200" y1="90" x2="290" y2="140" style={{ strokeDasharray: '4 4', animation: 'dash 7s linear infinite' }} />
+        </g>
+
+        {/* Central Patient Node */}
+        <g>
+          <circle cx="200" cy="90" r="22" fill="#0d9488" fillOpacity="0.15" stroke="#0d9488" strokeWidth="2.5" className="animate-pulse" />
+          <circle cx="200" cy="90" r="16" fill="#0d9488" />
+          <text x="200" y="93" textAnchor="middle" fill="#ffffff" className="text-[10px] font-extrabold select-none">YOU</text>
+        </g>
+
+        {/* Orbiting Node 1: Conditions */}
+        <g>
+          <circle cx="70" cy="40" r="14" fill="#f59e0b" fillOpacity="0.1" stroke="#f59e0b" strokeWidth="1.5" />
+          <circle cx="70" cy="40" r="10" fill="#f59e0b" />
+          <text x="70" y="43" textAnchor="middle" fill="#ffffff" className="text-[8px] font-extrabold select-none">DX</text>
+          <text x="70" y="18" textAnchor="middle" className="text-[8px] font-bold fill-slate-555 dark:fill-slate-400 select-none">Diabetes</text>
+        </g>
+
+        {/* Orbiting Node 2: Medications */}
+        <g>
+          <circle cx="100" cy="140" r="14" fill="#14b8a6" fillOpacity="0.1" stroke="#14b8a6" strokeWidth="1.5" />
+          <circle cx="100" cy="140" r="10" fill="#14b8a6" />
+          <text x="100" y="143" textAnchor="middle" fill="#ffffff" className="text-[8px] font-extrabold select-none">Rx</text>
+          <text x="100" y="163" textAnchor="middle" className="text-[8px] font-bold fill-slate-555 dark:fill-slate-400 select-none">Metformin</text>
+        </g>
+
+        {/* Orbiting Node 3: Lab Results */}
+        <g>
+          <circle cx="330" cy="50" r="14" fill="#8b5cf6" fillOpacity="0.1" stroke="#8b5cf6" strokeWidth="1.5" />
+          <circle cx="330" cy="50" r="10" fill="#8b5cf6" />
+          <text x="330" y="53" textAnchor="middle" fill="#ffffff" className="text-[8px] font-extrabold select-none">Lab</text>
+          <text x="330" y="73" textAnchor="middle" className="text-[8px] font-bold fill-slate-555 dark:fill-slate-400 select-none">HbA1c</text>
+        </g>
+
+        {/* Orbiting Node 4: Documents */}
+        <g>
+          <circle cx="290" cy="140" r="14" fill="#3b82f6" fillOpacity="0.1" stroke="#3b82f6" strokeWidth="1.5" />
+          <circle cx="290" cy="140" r="10" fill="#3b82f6" />
+          <text x="290" y="143" textAnchor="middle" fill="#ffffff" className="text-[8px] font-extrabold select-none">Doc</text>
+          <text x="290" y="163" textAnchor="middle" className="text-[8px] font-bold fill-slate-555 dark:fill-slate-400 select-none">Records</text>
+        </g>
+      </svg>
+
+      <div className="text-center z-10 w-full">
+        <span className="text-[9px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider bg-teal-50 dark:bg-teal-950/30 px-2 py-0.5 rounded border border-teal-100 dark:border-teal-900/50 block truncate">
+          Memory Graph Active: {nodesCount} Nodes
+        </span>
+      </div>
+    </div>
+  );
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [patient, setPatient] = useState<any>(null);
@@ -356,14 +551,7 @@ export default function DashboardPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-1 overflow-x-auto py-1">
-                        {trend.points.map((pt: any, i: number) => (
-                          <div key={i} className="flex-shrink-0 flex items-center space-x-1 bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded text-[10px] text-slate-500 font-medium">
-                            <span>{formatDate(pt.date).split(' ')[0]}</span>
-                            <span className="font-bold text-slate-800 dark:text-slate-200">{pt.value}</span>
-                          </div>
-                        ))}
-                      </div>
+                      <LabTrendChart trend={trend} />
                     </div>
                   );
                 })}
@@ -406,54 +594,60 @@ export default function DashboardPage() {
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">Continuous medical reasoning across your history.</p>
                 </div>
-                <div className="flex items-center space-x-2 bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-lg">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Graph: {graphMetrics.nodes} nodes · {graphMetrics.edges} edges
-                  </span>
-                </div>
               </div>
 
-              <div className="space-y-4">
-                {clinicalInsights.length === 0 ? (
-                  <div className="text-center py-6 text-slate-400 text-xs italic">
-                    No clinical warnings or disease progression risks detected.
-                  </div>
-                ) : (
-                  clinicalInsights.map((insight, idx) => {
-                    const isCrit = insight.severity === 'critical';
-                    const isWarn = insight.severity === 'warning';
-                    return (
-                      <div key={idx} className="bg-slate-50/50 dark:bg-slate-850/30 border border-slate-100 dark:border-slate-800/80 p-4 rounded-xl space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-850 dark:text-slate-200 uppercase tracking-wider">{insight.title}</span>
-                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                            isCrit ? 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400' :
-                            isWarn ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400' :
-                            'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400'
-                          }`}>
-                            {insight.severity}
-                          </span>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Insights list column */}
+                <div className="lg:col-span-2 space-y-4">
+                  {clinicalInsights.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 text-xs italic bg-slate-50/20 dark:bg-slate-950/10 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                      No clinical warnings or disease progression risks detected.
+                    </div>
+                  ) : (
+                    clinicalInsights.map((insight, idx) => {
+                      const isCrit = insight.severity === 'critical';
+                      const isWarn = insight.severity === 'warning';
+                      return (
+                        <div key={idx} className="bg-slate-50/50 dark:bg-slate-850/30 border border-slate-100 dark:border-slate-800/80 p-4 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-850 dark:text-slate-200 uppercase tracking-wider">{insight.title}</span>
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                              isCrit ? 'bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400' :
+                              isWarn ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400' :
+                              'bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400'
+                            }`}>
+                              {insight.severity}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed">{insight.description}</p>
+                          
+                          {/* Citations */}
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100/50 dark:border-slate-800/40">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-1">Evidence:</span>
+                            {insight.citations.map((cit: any, cIdx: number) => (
+                              <Link
+                                key={cIdx}
+                                href={`/app/documents/${cit.documentId}/review`}
+                                className="inline-flex items-center px-2 py-0.5 bg-white dark:bg-slate-850 border border-slate-150/60 dark:border-slate-700/60 rounded text-[10px] text-teal-650 dark:text-teal-400 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                {cit.documentTitle.replace(/\.[^/.]+$/, '')} ({cit.date})
+                              </Link>
+                            ))}
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed">{insight.description}</p>
-                        
-                        {/* Citations */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100/50 dark:border-slate-800/40">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-1">Evidence:</span>
-                          {insight.citations.map((cit: any, cIdx: number) => (
-                            <Link
-                              key={cIdx}
-                              href={`/app/documents/${cit.documentId}/review`}
-                              className="inline-flex items-center px-2 py-0.5 bg-white dark:bg-slate-850 border border-slate-150/60 dark:border-slate-700/60 rounded text-[10px] text-teal-650 dark:text-teal-400 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                            >
-                              {cit.documentTitle.replace(/\.[^/.]+$/, '')} ({cit.date})
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Graph Visualization column */}
+                <div className="lg:col-span-1">
+                  <AIKnowledgeGraphVisualizer 
+                    patientName={patient?.fullName || "Patient"} 
+                    nodesCount={graphMetrics.nodes || 0} 
+                    edgesCount={graphMetrics.edges || 0} 
+                  />
+                </div>
               </div>
             </div>
 
