@@ -146,13 +146,18 @@ export async function POST(
 
       } catch (err: any) {
         console.error('Background document processing failed:', err);
+        const code = err.code || 'PIPELINE_ERROR';
+        const msg = err.code === 'LOCAL_OCR_UNAVAILABLE'
+          ? 'The local OCR service is offline. Please run "npm run ocr:start".'
+          : (err.message || 'Structured AI extraction failed.');
+          
         await adminSupabase
           .from('processing_jobs')
           .update({
             status: 'failed',
             completed_at: new Date().toISOString(),
-            error_code: 'PIPELINE_ERROR',
-            safe_error_message: err.message || 'Structured AI extraction failed.'
+            error_code: code,
+            safe_error_message: msg
           })
           .eq('document_id', documentId);
       }
@@ -169,6 +174,15 @@ export async function POST(
 
   } catch (err: any) {
     console.error('Processing trigger API error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (err.code === 'LOCAL_OCR_UNAVAILABLE') {
+      return NextResponse.json({
+        code: 'LOCAL_OCR_UNAVAILABLE',
+        message: 'The local OCR service is temporarily offline. Please start it using "npm run ocr:start".'
+      }, { status: 503 });
+    }
+    return NextResponse.json({ 
+      error: 'Trigger failed', 
+      message: err.message || 'Internal server error' 
+    }, { status: 400 });
   }
 }

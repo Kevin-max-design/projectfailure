@@ -9,6 +9,29 @@ export class ServerTimelineGenerator {
   ): Promise<void> {
     const supabase = createAdminClient();
 
+    let sourceDocId = null;
+    if (recordType === 'diagnosis') {
+      const { data: r } = await supabase.from('diagnoses').select('source_document_id').eq('record_id', recordId).single();
+      sourceDocId = r?.source_document_id || null;
+    } else if (recordType === 'medication') {
+      const { data: r } = await supabase.from('medications').select('source_document_id').eq('record_id', recordId).single();
+      sourceDocId = r?.source_document_id || null;
+    } else if (recordType === 'lab_result') {
+      const { data: r } = await supabase.from('lab_results').select('source_document_id').eq('record_id', recordId).single();
+      sourceDocId = r?.source_document_id || null;
+    } else if (recordType === 'procedure') {
+      const { data: r } = await supabase.from('procedures').select('source_document_id').eq('record_id', recordId).single();
+      sourceDocId = r?.source_document_id || null;
+    }
+
+    if (sourceDocId) {
+      const { data: doc } = await supabase.from('documents').select('document_type, category').eq('id', sourceDocId).single();
+      const docTypeUpper = (doc?.document_type || doc?.category || '').toUpperCase();
+      if (['PHARMACY_INVOICE', 'OP_BILL_RECEIPT'].includes(docTypeUpper)) {
+        return;
+      }
+    }
+
     if (recordType === 'diagnosis') {
       const { data: dx } = await supabase
         .from('diagnoses')

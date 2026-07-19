@@ -183,7 +183,8 @@ export default function DocumentsPage() {
         });
 
         if (!procResponse.ok) {
-          alert('Failed to trigger background document processing pipeline.');
+          const errData = await procResponse.json().catch(() => ({}));
+          alert(errData.message || 'Failed to trigger background document processing pipeline.');
           setUploading(false);
           return;
         }
@@ -260,7 +261,7 @@ export default function DocumentsPage() {
 
     // Insert structured medical records (Layer 3 - pending review)
     // Diagnoses
-    extraction.diagnoses.forEach((dx, i) => {
+    extraction.diagnoses?.forEach((dx: any, i: number) => {
       const recordId = `rec-dx-${docId}-${i}`;
       mockDb.query('medical_records').insert({
         id: recordId,
@@ -289,7 +290,7 @@ export default function DocumentsPage() {
     });
 
     // Medications
-    extraction.medications.forEach((med, i) => {
+    extraction.medications?.forEach((med: any, i: number) => {
       const recordId = `rec-med-${docId}-${i}`;
       mockDb.query('medical_records').insert({
         id: recordId,
@@ -325,7 +326,7 @@ export default function DocumentsPage() {
     });
 
     // Lab Results
-    extraction.labResults.forEach((lab, i) => {
+    extraction.labResults?.forEach((lab: any, i: number) => {
       const recordId = `rec-lab-${docId}-${i}`;
       mockDb.query('medical_records').insert({
         id: recordId,
@@ -371,8 +372,8 @@ export default function DocumentsPage() {
       event_date: eventDate,
       event_type: extraction.documentType === 'Discharge Summary' ? 'Hospital Admission' : 'Doctor Visit',
       title: extraction.documentTitle.value || `Medical Record Uploaded`,
-      hospital_name: extraction.hospitalName.value,
-      doctor_name: extraction.doctorName.value,
+      hospital_name: extraction.hospitalName?.value || null,
+      doctor_name: extraction.doctorName?.value || null,
       summary: `Document processed. Contains ${extraction.diagnoses?.length || 0} diagnoses, ${extraction.medications?.length || 0} medications.`,
       source_document_id: docId,
       verification_status: 'pending_review'

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server';
-import { OpenAIQAProvider } from '@/lib/providers/openai-qa-provider';
+import { createQAProvider } from '@/lib/providers/provider-factory';
 import { isDemoMode } from '@/lib/mode';
 
 export async function POST(request: NextRequest) {
@@ -120,13 +120,25 @@ export async function POST(request: NextRequest) {
         };
       });
 
-    // 3. Query RAG QA Provider
-    const qaProvider = new OpenAIQAProvider();
+    // 3. Query RAG QA Provider with longitudinal copilot context
+    const { MedicalGraphService } = await import('@/lib/services/medical-graph');
+    
+    // Generate compressed patient memory summary
+    const compressedMemory = await MedicalGraphService.generateCompressedMemory(patientId, supabase, false);
+    
+    // Compute panels, switches, and journeys
+    const panels = await MedicalGraphService.computeLabPanels(patientId, supabase, false);
+    const switches = await MedicalGraphService.detectMedicationSwitches(patientId, supabase, false);
+    const journeys = await MedicalGraphService.analyzeDiseaseJourneys(patientId, supabase, false);
+
+    const qaProvider = createQAProvider();
     const answerResult = await qaProvider.askQuestion(
       question,
       patientId,
       rankedChunks,
-      structuredRecords
+      structuredRecords,
+      compressedMemory,
+      { panels, switches, journeys }
     );
 
     // 4. Log RAG Query Submission to activity logs

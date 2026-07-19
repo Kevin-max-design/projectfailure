@@ -35,7 +35,7 @@ export interface Document {
   storagePath: string; // Layer 1 (Private bucket path)
   processedStoragePath?: string; // Optional processed version path
   category: DocumentCategory;
-  processingStatus: 'queued' | 'preprocessing' | 'ocr_processing' | 'extracting' | 'awaiting_review' | 'completed' | 'failed';
+  processingStatus: 'queued' | 'preprocessing' | 'ocr_processing' | 'extracting' | 'awaiting_review' | 'completed' | 'failed' | 'awaiting_split_review';
   errorMessage?: string;
   metadata?: Record<string, any>;
   createdAt: string;

@@ -1,11 +1,12 @@
 import { createAdminClient } from '../supabase/server';
-import { QAAnswer, DemoQuestionAnsweringProvider } from '../providers/question-answering-provider';
+import { QAAnswer, QuestionAnsweringProvider } from '../providers/question-answering-provider';
+import { createQAProvider } from '../providers/provider-factory';
 
 export class ServerRAGEngine {
-  private qaProvider: DemoQuestionAnsweringProvider;
+  private qaProvider: QuestionAnsweringProvider;
 
   constructor() {
-    this.qaProvider = new DemoQuestionAnsweringProvider();
+    this.qaProvider = createQAProvider();
   }
 
   async answerPatientQuestion(patientId: string, question: string): Promise<QAAnswer> {

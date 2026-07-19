@@ -34,6 +34,8 @@ export const DEMO_DOCUMENTS: DemoDocumentFixture[] = [
     doctorName: 'Dr. Ramesh Kumar',
     extraction: {
       documentType: 'Discharge Summary',
+      classificationConfidence: 1.0,
+      classificationSource: "demo_data",
       documentTitle: { value: 'Discharge Summary', confidence: 0.98, sourceText: 'DISCHARGE SUMMARY', page: 1 },
       documentDate: { value: '2023-07-18', confidence: 0.96, sourceText: 'Date of Discharge: 18 July 2023', page: 1 },
       hospitalName: { value: 'Apollo Hospital', confidence: 0.99, sourceText: 'APOLLO HEALTH CITY', page: 1 },
@@ -112,6 +114,8 @@ export const DEMO_DOCUMENTS: DemoDocumentFixture[] = [
     doctorName: 'Dr. Anita Desai',
     extraction: {
       documentType: 'Lab Report',
+      classificationConfidence: 1.0,
+      classificationSource: "demo_data",
       documentTitle: { value: 'Lipid Profile', confidence: 0.99, sourceText: 'LIPID PROFILE (SERUM)', page: 1 },
       documentDate: { value: '2024-04-15', confidence: 0.98, sourceText: 'Date: 15-Apr-2024', page: 1 },
       hospitalName: { value: 'City Diagnostics Clinic', confidence: 0.97, sourceText: 'CITY DIAGNOSTICS CLINIC', page: 1 },
@@ -203,6 +207,8 @@ export const DEMO_DOCUMENTS: DemoDocumentFixture[] = [
     doctorName: 'Dr. V. K. Mohan',
     extraction: {
       documentType: 'Prescription',
+      classificationConfidence: 1.0,
+      classificationSource: "demo_data",
       documentTitle: { value: 'Prescription / Consultation Note', confidence: 0.95, sourceText: 'CLINICAL PRESCRIPTION', page: 1 },
       documentDate: { value: '2025-11-10', confidence: 0.97, sourceText: 'Date: 10/11/2025', page: 1 },
       hospitalName: { value: 'Diabetes Care Clinic', confidence: 0.98, sourceText: 'Mohan Diabetes Centre', page: 1 },
@@ -278,6 +284,8 @@ export const DEMO_DOCUMENTS: DemoDocumentFixture[] = [
     doctorName: 'Dr. Ramesh Kumar',
     extraction: {
       documentType: 'Discharge Summary',
+      classificationConfidence: 1.0,
+      classificationSource: "demo_data",
       documentTitle: { value: 'Discharge Summary', confidence: 0.98, sourceText: 'DISCHARGE SUMMARY', page: 1 },
       documentDate: { value: '2026-05-12', confidence: 0.95, sourceText: 'Date of Discharge: 12 May 2026', page: 1 },
       hospitalName: { value: 'Apollo Hospital', confidence: 0.99, sourceText: 'APOLLO HEALTH CITY', page: 1 },

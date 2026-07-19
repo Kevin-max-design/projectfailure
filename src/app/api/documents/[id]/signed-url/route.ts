@@ -49,11 +49,28 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden: Access denied to this document' }, { status: 403 });
     }
 
+    // Determine path based on query param: type = 'original' | 'normalized'
+    const viewType = request.nextUrl.searchParams.get('type') || 'normalized';
+    let filePath = doc.storage_path;
+
+    if (viewType === 'normalized') {
+      const { data: pageData } = await supabase
+        .from('document_pages')
+        .select('normalized_storage_path')
+        .eq('document_id', documentId)
+        .eq('page_number', 1)
+        .maybeSingle();
+      
+      if (pageData?.normalized_storage_path) {
+        filePath = pageData.normalized_storage_path;
+      }
+    }
+
     // Create signed URL
     const adminSupabase = createAdminClient();
     const { data, error: signedUrlError } = await adminSupabase.storage
       .from('medical-records')
-      .createSignedUrl(doc.storage_path, 60); // 60 seconds expiration
+      .createSignedUrl(filePath, 60); // 60 seconds expiration
 
     if (signedUrlError || !data) {
       console.error('Signed URL generation failed:', signedUrlError);

@@ -121,9 +121,9 @@ export async function POST(
           patient_id: patient.id,
           version_number: nextVersion,
           raw_payload: extraction,
-          extraction_method: 'ai_openai',
-          provider: 'openai',
-          model: process.env.AI_MODEL || 'gpt-4o'
+          extraction_method: pipeline.getExtractionMethod(),
+          provider: pipeline.getProviderName(),
+          model: pipeline.getModelName()
         });
 
         // Insert new extraction results that DO NOT conflict with verified entities
@@ -164,7 +164,7 @@ export async function POST(
                   source_document_id: documentId,
                   source_page: dx.page || 1,
                   source_text: dx.sourceText,
-                  extraction_method: 'ai_openai',
+                  extraction_method: pipeline.getExtractionMethod(),
                   confidence_score: dx.confidence,
                   verification_status: 'pending_review'
                 });
@@ -211,7 +211,7 @@ export async function POST(
                   source_document_id: documentId,
                   source_page: med.page || 1,
                   source_text: med.sourceText,
-                  extraction_method: 'ai_openai',
+                  extraction_method: pipeline.getExtractionMethod(),
                   confidence_score: med.confidence,
                   verification_status: 'pending_review'
                 });
@@ -231,13 +231,18 @@ export async function POST(
 
       } catch (err: any) {
         console.error('Reprocessing failure:', err);
+        const code = err.code || 'REPROCESS_FAILURE';
+        const msg = err.code === 'LOCAL_OCR_UNAVAILABLE'
+          ? 'The local OCR service is offline. Please run "npm run ocr:start".'
+          : (err.message || 'Reprocessing extraction run failed.');
+
         await adminSupabase
           .from('processing_jobs')
           .update({
             status: 'failed',
             completed_at: new Date().toISOString(),
-            error_code: 'REPROCESS_FAILURE',
-            safe_error_message: err.message || 'Reprocessing extraction run failed.'
+            error_code: code,
+            safe_error_message: msg
           })
           .eq('document_id', documentId);
       }
@@ -253,6 +258,15 @@ export async function POST(
 
   } catch (err: any) {
     console.error('Reprocess API error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (err.code === 'LOCAL_OCR_UNAVAILABLE') {
+      return NextResponse.json({
+        code: 'LOCAL_OCR_UNAVAILABLE',
+        message: 'The local OCR service is temporarily offline. Please start it using "npm run ocr:start".'
+      }, { status: 503 });
+    }
+    return NextResponse.json({ 
+      error: 'Reprocess failed', 
+      message: err.message || 'Internal server error' 
+    }, { status: 400 });
   }
 }

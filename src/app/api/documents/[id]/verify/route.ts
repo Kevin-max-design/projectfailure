@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { ServerTimelineGenerator } from '@/lib/timeline/server-generator';
 import { isDemoMode } from '@/lib/mode';
+import { LongitudinalBrainService } from '@/lib/services/longitudinal-brain';
 
 export async function POST(
   request: NextRequest,
@@ -110,6 +111,61 @@ export async function POST(
         recordType,
         patient.id
       );
+
+      // Trigger Longitudinal Profile Sync
+      await LongitudinalBrainService.syncProfileFromRecords(patient.id, supabase, false);
+
+      // Rebuild and Sync Patient Knowledge Graph
+      const { MedicalGraphService } = await import('@/lib/services/medical-graph');
+      await MedicalGraphService.buildGraphFromRecords(patient.id, supabase, false);
+      await MedicalGraphService.syncMemory(patient.id, supabase, false);
+
+      // For Phase 8: Continuous Learning loop, capture reviewer feedback on correction
+      if (action === 'correct') {
+        try {
+          // Fetch OCR text
+          const { data: pages } = await supabase
+            .from('document_pages')
+            .select('ocr_text')
+            .eq('document_id', documentId)
+            .order('page_number', { ascending: true });
+          const originalOcr = (pages || []).map((p: any) => p.ocr_text || '').join('\n');
+
+          // Fetch original extraction
+          const { data: rawExt } = await supabase
+            .from('raw_extractions')
+            .select('raw_payload')
+            .eq('document_id', documentId)
+            .single();
+          const originalPayload = rawExt?.raw_payload || {};
+
+          // Fetch all current records for this document to represent the corrected payload
+          const { data: diagnoses } = await supabase.from('diagnoses').select('*').eq('source_document_id', documentId);
+          const { data: medications } = await supabase.from('medications').select('*').eq('source_document_id', documentId);
+          const { data: labResults } = await supabase.from('lab_results').select('*').eq('source_document_id', documentId);
+          const { data: procedures } = await supabase.from('procedures').select('*').eq('source_document_id', documentId);
+
+          const correctedPayload = {
+            diagnoses: diagnoses || [],
+            medications: medications || [],
+            labResults: labResults || [],
+            procedures: procedures || []
+          };
+
+          await MedicalGraphService.saveCorrectionFeedback(
+            patient.id,
+            documentId,
+            originalOcr,
+            originalPayload,
+            correctedPayload,
+            { fieldName, oldValue, newValue, recordId, entityType },
+            supabase,
+            false
+          );
+        } catch (feedErr) {
+          console.error('Failed to log continuous learning feedback:', feedErr);
+        }
+      }
     } else if (verificationStatus === 'rejected') {
       // Clean up unverified medical_events from timeline if rejected
       await supabase
@@ -118,6 +174,14 @@ export async function POST(
         .eq('source_document_id', documentId)
         .eq('patient_id', patient.id)
         .eq('verification_status', 'pending_review');
+
+      // Trigger Longitudinal Profile Sync to recalculate active problems / meds
+      await LongitudinalBrainService.syncProfileFromRecords(patient.id, supabase, false);
+
+      // Rebuild and Sync Patient Knowledge Graph
+      const { MedicalGraphService } = await import('@/lib/services/medical-graph');
+      await MedicalGraphService.buildGraphFromRecords(patient.id, supabase, false);
+      await MedicalGraphService.syncMemory(patient.id, supabase, false);
     }
 
     return NextResponse.json({ success: true, verificationStatus });

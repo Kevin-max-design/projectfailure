@@ -1,0 +1,106 @@
+"use strict";
+'use client';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.default = PublicEmergencyView;
+const jsx_runtime_1 = require("react/jsx-runtime");
+const react_1 = require("react");
+const navigation_1 = require("next/navigation");
+const lucide_react_1 = require("lucide-react");
+const service_1 = require("@/lib/supabase/service");
+const utils_1 = require("@/lib/utils");
+const mode_1 = require("@/lib/mode");
+function PublicEmergencyView() {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m;
+    const params = (0, navigation_1.useParams)();
+    const token = params.token;
+    const [authorized, setAuthorized] = (0, react_1.useState)(null);
+    const [patient, setPatient] = (0, react_1.useState)(null);
+    const [loading, setLoading] = (0, react_1.useState)(true);
+    (0, react_1.useEffect)(() => {
+        loadPublicEmergency();
+    }, [token]);
+    const loadPublicEmergency = async () => {
+        if ((0, mode_1.isDemoMode)()) {
+            const activeTokenRecord = service_1.mockDb.query('emergency_access_tokens').select().eq('token', token).single().data;
+            if (activeTokenRecord && activeTokenRecord.is_enabled) {
+                setAuthorized(true);
+                const storedProfile = localStorage.getItem('medmemory_patient_profile');
+                const p = storedProfile ? JSON.parse(storedProfile) : service_1.DEMO_PATIENT;
+                // Apply disclosure config rules in demo mode
+                const localConfig = localStorage.getItem('medmemory_emergency_config');
+                const config = localConfig ? JSON.parse(localConfig) : {
+                    show_name: true,
+                    show_blood_group: true,
+                    show_allergies: true,
+                    show_conditions: true,
+                    show_medications: true,
+                    show_contact: true,
+                    show_surgeries: true,
+                    show_hospitalizations: true
+                };
+                const redacted = {
+                    fullName: config.show_name ? p.fullName : 'Redacted / Hidden',
+                    bloodGroup: config.show_blood_group ? { value: p.bloodGroup || 'Unknown', provenance: 'patient-entered' } : { value: 'Redacted / Hidden', provenance: 'redacted' },
+                    dateOfBirth: p.dateOfBirth,
+                    knownAllergies: config.show_allergies ? (p.knownAllergies || []).map((v) => ({ value: v, provenance: 'patient-entered' })) : [],
+                    knownChronicConditions: config.show_conditions ? (p.knownChronicConditions || []).map((v) => ({ value: v, provenance: 'patient-entered' })) : [],
+                    currentLongTermMedications: config.show_medications ? (p.currentLongTermMedications || []).map((v) => ({ value: v, provenance: 'patient-entered' })) : []
+                };
+                if (config.show_contact) {
+                    redacted.emergencyContactName = p.emergencyContactName;
+                    redacted.emergencyContactPhone = p.emergencyContactPhone;
+                }
+                setPatient(redacted);
+            }
+            else {
+                setAuthorized(false);
+            }
+            setLoading(false);
+        }
+        else {
+            try {
+                const res = await fetch(`/api/public/emergency?token=${token}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setAuthorized(true);
+                    setPatient(data);
+                }
+                else {
+                    setAuthorized(false);
+                }
+            }
+            catch (err) {
+                console.error('Error fetching public emergency details:', err);
+                setAuthorized(false);
+            }
+            finally {
+                setLoading(false);
+            }
+        }
+    };
+    const handlePrint = () => {
+        window.print();
+    };
+    if (loading) {
+        return ((0, jsx_runtime_1.jsx)("div", { className: "min-h-screen flex items-center justify-center bg-slate-50", children: (0, jsx_runtime_1.jsx)("div", { className: "animate-spin rounded-full h-8 w-8 border-b-2 border-red-600" }) }));
+    }
+    if (authorized === false || !patient) {
+        return ((0, jsx_runtime_1.jsx)("div", { className: "min-h-screen flex items-center justify-center bg-slate-50 px-4", children: (0, jsx_runtime_1.jsxs)("div", { className: "max-w-md w-full bg-white border border-slate-200 rounded-3xl p-8 text-center shadow-lg space-y-4", children: [(0, jsx_runtime_1.jsx)("div", { className: "inline-flex p-4 bg-red-50 text-red-655 rounded-2xl", children: (0, jsx_runtime_1.jsx)(lucide_react_1.AlertTriangle, { className: "h-8 w-8" }) }), (0, jsx_runtime_1.jsx)("h2", { className: "text-xl font-bold text-slate-850", children: "Access Token Expired or Revoked" }), (0, jsx_runtime_1.jsx)("p", { className: "text-xs text-slate-500 leading-relaxed", children: "The emergency medical portal link has been deactivated or regenerated by the patient. For privacy and data security, full clinical details are hidden." })] }) }));
+    }
+    // Calculate age
+    const dob = new Date(patient.dateOfBirth);
+    const ageDiff = Date.now() - dob.getTime();
+    const ageDate = new Date(ageDiff);
+    const patientAge = Math.abs(ageDate.getUTCFullYear() - 1970);
+    return ((0, jsx_runtime_1.jsx)("div", { className: "min-h-screen bg-slate-50 dark:bg-slate-950 py-8 px-4 flex flex-col items-center", children: (0, jsx_runtime_1.jsxs)("div", { className: "max-w-2xl w-full bg-white dark:bg-slate-900 border-2 border-red-500/20 dark:border-red-500/30 rounded-3xl shadow-xl overflow-hidden print:border-none print:shadow-none", children: [(0, jsx_runtime_1.jsxs)("div", { className: "bg-red-650 text-white p-5 flex items-center justify-between", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex items-center space-x-3", children: [(0, jsx_runtime_1.jsx)(lucide_react_1.ShieldAlert, { className: "h-7 w-7 animate-pulse" }), (0, jsx_runtime_1.jsxs)("div", { children: [(0, jsx_runtime_1.jsx)("h1", { className: "text-lg font-black tracking-wider uppercase", children: "MEDICAL ALERT \u2014 Emergency ID" }), (0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-red-100 font-semibold block", children: "Critical Clinical Patient Profile Summary" })] })] }), (0, jsx_runtime_1.jsx)("button", { onClick: handlePrint, className: "p-2 bg-red-750 hover:bg-red-800 rounded-xl transition-colors text-white border border-red-500/30 print:hidden", title: "Print record card", children: (0, jsx_runtime_1.jsx)(lucide_react_1.Printer, { className: "h-4.5 w-4.5" }) })] }), (0, jsx_runtime_1.jsxs)("div", { className: "bg-amber-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-800 p-4 flex items-start space-x-3", children: [(0, jsx_runtime_1.jsx)(lucide_react_1.AlertTriangle, { className: "h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" }), (0, jsx_runtime_1.jsx)("p", { className: "text-xs text-slate-655 dark:text-slate-300 leading-relaxed font-semibold", children: "Important Information: This summary represents patient-provided critical summaries and verified extraction records. It may not represent the complete diagnostic history." })] }), (0, jsx_runtime_1.jsxs)("div", { className: "p-6 md:p-8 space-y-8", children: [(0, jsx_runtime_1.jsxs)("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm", children: [(0, jsx_runtime_1.jsxs)("div", { className: "space-y-1", children: [(0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider block", children: "Full Name" }), (0, jsx_runtime_1.jsx)("span", { className: "font-extrabold text-slate-850 dark:text-white text-md", children: patient.fullName })] }), (0, jsx_runtime_1.jsxs)("div", { className: "space-y-1", children: [(0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider block", children: "Blood Group" }), (0, jsx_runtime_1.jsxs)("span", { className: "font-extrabold text-red-650 text-md flex items-center", children: [((_a = patient.bloodGroup) === null || _a === void 0 ? void 0 : _a.value) || patient.bloodGroup || 'Unknown', (0, jsx_runtime_1.jsx)("span", { className: `text-[8px] px-1 py-0.2 rounded ml-1.5 font-normal uppercase tracking-normal ${((_b = patient.bloodGroup) === null || _b === void 0 ? void 0 : _b.provenance) === 'document-verified'
+                                                        ? 'bg-teal-50 dark:bg-teal-950/30 text-teal-600 border border-teal-500/20'
+                                                        : ((_c = patient.bloodGroup) === null || _c === void 0 ? void 0 : _c.provenance) === 'conflict'
+                                                            ? 'bg-red-50 dark:bg-red-950/30 text-red-600 border border-red-500/20 animate-pulse'
+                                                            : 'bg-slate-100 text-slate-550'}`, children: ((_d = patient.bloodGroup) === null || _d === void 0 ? void 0 : _d.provenance) === 'document-verified' ? 'Document Verified' : ((_e = patient.bloodGroup) === null || _e === void 0 ? void 0 : _e.provenance) === 'conflict' ? 'Conflict Warning' : 'Patient Entered' })] }), ((_f = patient.bloodGroup) === null || _f === void 0 ? void 0 : _f.provenance) === 'conflict' && ((0, jsx_runtime_1.jsx)("span", { className: "text-[9px] text-red-500 font-semibold block mt-1", children: "\u26A0\uFE0F Warning: Patient-reported and lab-verified blood types do not match!" }))] }), (0, jsx_runtime_1.jsxs)("div", { className: "space-y-1", children: [(0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider block", children: "Age / DOB" }), (0, jsx_runtime_1.jsxs)("span", { className: "font-bold text-slate-800 dark:text-slate-200", children: [patientAge, " Years (", (0, utils_1.formatDate)(patient.dateOfBirth), ")"] })] }), (0, jsx_runtime_1.jsxs)("div", { className: "space-y-1", children: [(0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-slate-400 font-bold uppercase tracking-wider block", children: "Emergency Contact" }), patient.emergencyContactName ? ((0, jsx_runtime_1.jsxs)("div", { className: "flex items-center space-x-2 text-slate-805 dark:text-slate-200 font-bold", children: [(0, jsx_runtime_1.jsx)(lucide_react_1.User, { className: "h-4 w-4 text-slate-400" }), (0, jsx_runtime_1.jsxs)("span", { children: [patient.emergencyContactName, " (", patient.emergencyContactPhone, ")"] })] })) : ((0, jsx_runtime_1.jsx)("span", { className: "text-slate-400 italic", children: "No contact configured." }))] })] }), (0, jsx_runtime_1.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-xs", children: [(0, jsx_runtime_1.jsxs)("div", { className: "space-y-3", children: [(0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-slate-405 font-bold uppercase tracking-wider block", children: "Critical Allergies" }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-wrap gap-1.5", children: [(_g = patient.knownAllergies) === null || _g === void 0 ? void 0 : _g.map((alg, i) => ((0, jsx_runtime_1.jsxs)("span", { className: `px-2.5 py-1 rounded-full font-bold flex items-center ${alg.provenance === 'document-verified'
+                                                        ? 'bg-teal-50 dark:bg-teal-950/20 text-teal-700 dark:text-teal-400 border border-teal-500/10'
+                                                        : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400'}`, children: [alg.value || alg, (0, jsx_runtime_1.jsx)("span", { className: `text-[8px] ml-1 px-1 rounded uppercase font-normal tracking-normal ${alg.provenance === 'document-verified' ? 'bg-teal-100 text-teal-600' : 'bg-slate-100 text-slate-500'}`, children: alg.provenance === 'document-verified' ? 'Document Verified' : 'Patient Entered' })] }, i))), !((_h = patient.knownAllergies) === null || _h === void 0 ? void 0 : _h.length) && ((0, jsx_runtime_1.jsx)("span", { className: "text-slate-400 italic font-semibold", children: "No verified allergy information was found." }))] })] }), (0, jsx_runtime_1.jsxs)("div", { className: "space-y-3", children: [(0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-slate-405 font-bold uppercase tracking-wider block", children: "Chronic Conditions" }), (0, jsx_runtime_1.jsxs)("div", { className: "flex flex-wrap gap-1.5", children: [(_j = patient.knownChronicConditions) === null || _j === void 0 ? void 0 : _j.map((cond, i) => ((0, jsx_runtime_1.jsxs)("span", { className: `px-2.5 py-1 rounded-full font-bold flex items-center ${cond.provenance === 'document-verified'
+                                                        ? 'bg-teal-50 dark:bg-teal-950/20 text-teal-700 dark:text-teal-400 border border-teal-500/10'
+                                                        : 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400'}`, children: [cond.value || cond, (0, jsx_runtime_1.jsx)("span", { className: `text-[8px] ml-1 px-1 rounded uppercase font-normal tracking-normal ${cond.provenance === 'document-verified' ? 'bg-teal-100 text-teal-600' : 'bg-slate-100 text-slate-500'}`, children: cond.provenance === 'document-verified' ? 'Document Verified' : 'Patient Entered' })] }, i))), !((_k = patient.knownChronicConditions) === null || _k === void 0 ? void 0 : _k.length) && ((0, jsx_runtime_1.jsx)("span", { className: "text-slate-400 italic font-semibold", children: "No verified chronic condition record was found." }))] })] })] }), (0, jsx_runtime_1.jsxs)("div", { className: "pt-6 border-t border-slate-100 dark:border-slate-800 space-y-3 text-xs", children: [(0, jsx_runtime_1.jsx)("span", { className: "text-[10px] text-slate-405 font-bold uppercase tracking-wider block", children: "Current Daily Medications" }), (0, jsx_runtime_1.jsxs)("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-2", children: [(_l = patient.currentLongTermMedications) === null || _l === void 0 ? void 0 : _l.map((med, i) => ((0, jsx_runtime_1.jsxs)("div", { className: `p-2.5 border rounded-xl font-bold flex justify-between items-center ${med.provenance === 'document-verified'
+                                                ? 'bg-teal-50/30 dark:bg-teal-950/10 border-teal-500/20 text-slate-800 dark:text-slate-205'
+                                                : 'bg-slate-50 dark:bg-slate-850 border-slate-100 dark:border-slate-800 text-slate-800 dark:text-slate-350'}`, children: [(0, jsx_runtime_1.jsx)("span", { children: med.value || med }), (0, jsx_runtime_1.jsx)("span", { className: `text-[8px] px-1 rounded font-normal uppercase tracking-normal ${med.provenance === 'document-verified' ? 'bg-teal-100 text-teal-600' : 'bg-slate-100 text-slate-500'}`, children: med.provenance === 'document-verified' ? 'Document Verified' : 'Patient Entered' })] }, i))), !((_m = patient.currentLongTermMedications) === null || _m === void 0 ? void 0 : _m.length) && ((0, jsx_runtime_1.jsx)("span", { className: "text-slate-405 italic font-semibold", children: "No verified daily medications was found." }))] })] })] }), (0, jsx_runtime_1.jsxs)("div", { className: "bg-slate-50 dark:bg-slate-850 border-t border-slate-100 dark:border-slate-800 px-6 py-4 flex items-center justify-between text-[10px] text-slate-400 font-medium", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex items-center space-x-1.5", children: [(0, jsx_runtime_1.jsx)(lucide_react_1.HeartPulse, { className: "h-4 w-4 text-red-500" }), (0, jsx_runtime_1.jsx)("span", { children: "MedMemory Emergency Summary Portal" })] }), (0, jsx_runtime_1.jsxs)("span", { children: ["Ref: ", token.substring(0, 8)] })] })] }) }));
+}

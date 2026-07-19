@@ -3,8 +3,23 @@ export interface OCRResult {
   pages: {
     pageNumber: number;
     text: string;
+    rotationDegrees?: number;
+    skewAngle?: number;
+    width?: number;
+    height?: number;
+    originalImageBase64?: string;
+    normalizedImageBase64?: string;
+    blocks?: any[];
   }[];
   confidence: number; // 0 to 1
+  engine?: string;
+  detectedRegions?: {
+    regionId: string;
+    boundingBox: { x: number; y: number; width: number; height: number };
+    confidence: number;
+    croppedImageBase64: string;
+    ocrResult: any;
+  }[];
 }
 
 export interface OCRProvider {

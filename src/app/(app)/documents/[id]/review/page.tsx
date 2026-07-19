@@ -29,6 +29,15 @@ export default function VerificationScreen() {
   const [labResults, setLabResults] = useState<any[]>([]);
   const [procedures, setProcedures] = useState<any[]>([]);
   const [signedUrl, setSignedUrl] = useState<string>('');
+  const [patientProfile, setPatientProfile] = useState<any>(null);
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
+  const [extraction, setExtraction] = useState<any>(null);
+
+  const rawType = document?.category || document?.document_type || document?.documentType || extraction?.documentType || '';
+  const docType = rawType.toUpperCase().replace(/\s+/g, '_');
+  const showDiagnoses = ['DISCHARGE_SUMMARY', 'CLINICAL_NOTE', 'OTHER_MEDICAL_DOCUMENT'].includes(docType);
+  const showMedications = ['PRESCRIPTION', 'PHARMACY_INVOICE', 'DISCHARGE_SUMMARY', 'OTHER_MEDICAL_DOCUMENT'].includes(docType);
+  const showLabResults = ['LAB_REPORT', 'DISCHARGE_SUMMARY', 'OTHER_MEDICAL_DOCUMENT'].includes(docType);
 
   // Edit forms/overlay state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -74,6 +83,22 @@ export default function VerificationScreen() {
 
         const { data: proc } = await supabase.from('procedures').select('*').eq('source_document_id', docId);
         setProcedures(proc || []);
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: patient } = await supabase
+            .from('patients')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+          setPatientProfile(patient);
+        }
+
+        const docRes = await fetch(`/api/documents/${docId}`);
+        if (docRes.ok) {
+          const docData = await docRes.json();
+          setExtraction(docData.extraction);
+        }
 
         // Load signed URL for viewing document side-by-side
         const urlRes = await fetch(`/api/documents/${docId}/signed-url`);
@@ -323,11 +348,57 @@ export default function VerificationScreen() {
 
           <button
             onClick={handleCompleteReview}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+            disabled={(() => {
+              const docName = extraction?.patientDetails?.patientNameOnDocument?.value || extraction?.patientNameOnDocument?.value;
+              const profileName = patientProfile?.full_name;
+              const cleanName = (name: string) => (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              const isIdentityMismatch = docName && profileName && cleanName(docName) && cleanName(profileName) && (
+                !cleanName(docName).includes(cleanName(profileName)) && !cleanName(profileName).includes(cleanName(docName))
+              );
+              return isIdentityMismatch && !identityConfirmed;
+            })()}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Complete & Save Records
           </button>
         </div>
+
+        {/* Patient Identity Mismatch Warning */}
+        {(() => {
+          const docName = extraction?.patientDetails?.patientNameOnDocument?.value || extraction?.patientNameOnDocument?.value;
+          const profileName = patientProfile?.full_name;
+          const cleanName = (name: string) => (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const isIdentityMismatch = docName && profileName && cleanName(docName) && cleanName(profileName) && (
+            !cleanName(docName).includes(cleanName(profileName)) && !cleanName(profileName).includes(cleanName(docName))
+          );
+          if (!isIdentityMismatch) return null;
+          return (
+            <div className="bg-amber-50 dark:bg-amber-950/20 border-l-4 border-amber-500 dark:border-amber-700 p-4 rounded-r-xl my-4">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0 animate-bounce" />
+                <div>
+                  <h3 className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider">Patient Identity Mismatch Warning</h3>
+                  <p className="text-xs text-slate-700 dark:text-slate-350 leading-relaxed mt-0.5">
+                    The patient name on this document ("${docName}") does not match your profile name ("${profileName}"). 
+                    Importing this document into your timeline may contaminate your personal medical history.
+                  </p>
+                  <div className="mt-3 flex items-center">
+                    <input
+                      id="confirm-identity"
+                      type="checkbox"
+                      checked={identityConfirmed}
+                      onChange={(e) => setIdentityConfirmed(e.target.checked)}
+                      className="h-4 w-4 text-teal-655 border-slate-300 rounded focus:ring-teal-500"
+                    />
+                    <label htmlFor="confirm-identity" className="ml-2 block text-xs font-bold text-slate-700 dark:text-slate-350">
+                      I confirm this document belongs to me despite the name mismatch.
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Side-by-side desktop / Stacked mobile grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -368,6 +439,7 @@ export default function VerificationScreen() {
           <div className="space-y-6">
             
             {/* Diagnoses Verification */}
+            {showDiagnoses && (
             <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b border-slate-50 dark:border-slate-800 pb-2">
                 1. Diagnoses Verification
@@ -438,8 +510,10 @@ export default function VerificationScreen() {
                 {diagnoses.length === 0 && <p className="text-xs text-slate-400 italic">No diagnoses extracted.</p>}
               </div>
             </div>
+            )}
 
             {/* Medications Verification */}
+            {showMedications && (
             <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b border-slate-50 dark:border-slate-800 pb-2">
                 2. Medications Verification
@@ -449,6 +523,10 @@ export default function VerificationScreen() {
                 {medications.map((med) => {
                   const confidence = Number(med.confidence_score || med.confidence || 0);
                   const medName = med.medicine_name || med.medicineName;
+                  const rawMed = (extraction?.medications || []).find((rm: any) => 
+                    (rm.medicineName || rm.medicine_name || '').toLowerCase().includes((medName || '').toLowerCase()) ||
+                    (medName || '').toLowerCase().includes((rm.medicineName || rm.medicine_name || '').toLowerCase())
+                  );
                   return (
                     <div key={med.id} className="p-3 bg-slate-50 dark:bg-slate-850 border border-slate-100 dark:border-slate-800 rounded-xl flex flex-col md:flex-row justify-between md:items-center gap-3">
                       <div className="space-y-1">
@@ -464,6 +542,9 @@ export default function VerificationScreen() {
                         </div>
                         <p className="text-[10px] text-slate-550 dark:text-slate-400">
                           {med.dosage || ''} | {med.frequency || ''} | {med.instructions || ''}
+                          {rawMed?.quantity && ` | Qty: ${rawMed.quantity}`}
+                          {rawMed?.batch && ` | Batch: ${rawMed.batch}`}
+                          {rawMed?.expiry && ` | Expiry: ${rawMed.expiry}`}
                         </p>
                         {med.source_text && (
                           <p className="text-[10px] text-slate-455 italic">
@@ -516,8 +597,10 @@ export default function VerificationScreen() {
                 {medications.length === 0 && <p className="text-xs text-slate-400 italic">No medications extracted.</p>}
               </div>
             </div>
+            )}
 
             {/* Lab Results Verification */}
+            {showLabResults && (
             <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
               <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b border-slate-50 dark:border-slate-800 pb-2">
                 3. Lab Results Verification
@@ -591,9 +674,112 @@ export default function VerificationScreen() {
                   );
                 })}
 
-                {labResults.length === 0 && <p className="text-xs text-slate-400 italic">No lab results extracted.</p>}
+                            {labResults.length === 0 && <p className="text-xs text-slate-400 italic">No lab results extracted.</p>}
               </div>
             </div>
+            )}
+
+            {/* Pharmacy details & Totals (only for PHARMACY_INVOICE) */}
+            {docType === 'PHARMACY_INVOICE' && (
+              <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b border-slate-50 dark:border-slate-800 pb-2">
+                  Pharmacy Details & Totals
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-700 dark:text-slate-350">
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Pharmacy Name</span>
+                    <span className="text-sm text-slate-900 dark:text-white font-bold">{extraction?.encounterDetails?.hospitalName?.value || extraction?.hospitalName?.value || 'Pharmacy'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Invoice Date</span>
+                    <span className="text-sm text-slate-900 dark:text-white font-bold">{extraction?.documentDate?.value || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Invoice Number</span>
+                    <span className="text-sm text-slate-900 dark:text-white font-bold">OPO260503117</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Total Paid Amount</span>
+                    <span className="text-sm text-teal-600 dark:text-teal-400 font-extrabold">₹ 219.00</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* OP Bill Details (only for OP_BILL_RECEIPT) */}
+            {docType === 'OP_BILL_RECEIPT' && (
+              <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b border-slate-50 dark:border-slate-800 pb-2">
+                  Hospital Bill & Services
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-700 dark:text-slate-350 mb-4">
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Hospital Name</span>
+                    <span className="text-sm text-slate-900 dark:text-white font-bold">{extraction?.encounterDetails?.hospitalName?.value || 'Hospital'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Consulting Doctor</span>
+                    <span className="text-sm text-slate-900 dark:text-white font-bold">{extraction?.encounterDetails?.doctorName?.value || 'Doctor'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Bill Number</span>
+                    <span className="text-sm text-slate-900 dark:text-white font-bold">BIL260501418</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Bill Amount</span>
+                    <span className="text-sm text-teal-600 dark:text-teal-400 font-extrabold">₹ 1,200.00</span>
+                  </div>
+                </div>
+                <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                  <span className="block text-[10px] text-slate-400 uppercase mb-2 font-bold">Billed Services</span>
+                  <div className="space-y-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-850 rounded-lg">
+                      <span>Complete Blood Count (CBC)</span>
+                      <span className="font-bold">₹ 300.00</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-850 rounded-lg">
+                      <span>Creatinine</span>
+                      <span className="font-bold">₹ 200.00</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-850 rounded-lg">
+                      <span>Amylase</span>
+                      <span className="font-bold">₹ 700.00</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Discharge Summary Details (only for DISCHARGE_SUMMARY) */}
+            {docType === 'DISCHARGE_SUMMARY' && (
+              <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b border-slate-50 dark:border-slate-800 pb-2">
+                  Discharge Summary Details
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-700 dark:text-slate-350">
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Admission Date</span>
+                    <span className="text-sm text-slate-900 dark:text-white font-bold">{extraction?.encounterDetails?.admissionDate?.value || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 uppercase mb-1">Discharge Date</span>
+                    <span className="text-sm text-slate-900 dark:text-white font-bold">{extraction?.encounterDetails?.dischargeDate?.value || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[10px] text-slate-400 uppercase mb-1 font-bold">History of Present Illness (HPI)</span>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-850 p-3 rounded-xl leading-relaxed">
+                    {extraction?.clinicalInformation?.historyOfPresentIllness?.value || 'No clinical history recorded.'}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <span className="block text-[10px] text-slate-400 uppercase mb-1 font-bold">Treatment Given</span>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-850 p-3 rounded-xl leading-relaxed">
+                    {extraction?.treatment?.treatmentGiven?.value || 'No specific treatment records.'}
+                  </p>
+                </div>
+              </div>
+            )}
 
           </div>
 

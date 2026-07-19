@@ -17,7 +17,9 @@ export class OpenAIQAProvider implements QuestionAnsweringProvider {
     question: string,
     patientId: string,
     contextChunks: { text: string; documentId: string; documentTitle: string; pageNumber: number; date: string }[],
-    structuredRecords: any[]
+    structuredRecords: any[],
+    compressedMemory?: string,
+    copilotContext?: any
   ): Promise<QAAnswer> {
     
     // Build context prompt
@@ -48,13 +50,33 @@ ${chunk.text}
       })
       .join('\n');
 
-    const prompt = `You are a precise medical assistant chatbot.
-Your goal is to answer the patient's questions about their medical records.
-CRITICAL SAFETY RULE: You are not a doctor. You must NEVER formulate clinical diagnoses, suggest treatments, prescribe medications, or state causation of symptoms. Keep all explanations strictly objective.
-CRITICAL EVIDENCE RULE: Answer the question ONLY based on the provided document text chunks and structured medical records below. Do not assume or invent details.
-If the context does not contain evidence to answer the question, or if a user asks about a condition not documented in their records (e.g., "Do I have kidney disease?"), you MUST reply:
-"I couldn't find a verified record documenting [condition] in the records currently available." (replace [condition] with the disease or concern they asked about, e.g. "kidney disease"). Do not state "You do not have kidney disease" or "You are healthy".
+    // Format Copilot intelligence (Lab panels, journeys, med switches) if provided
+    let copilotContextString = '';
+    if (copilotContext) {
+      if (copilotContext.panels) {
+        copilotContextString += '\n[LABORATORY PANELS & STATISTICS]\n' + JSON.stringify(copilotContext.panels, null, 2) + '\n';
+      }
+      if (copilotContext.switches) {
+        copilotContextString += '\n[MEDICATION TIMELINE & THERAPEUTIC SWITCHES]\n' + JSON.stringify(copilotContext.switches, null, 2) + '\n';
+      }
+      if (copilotContext.journeys) {
+        copilotContextString += '\n[DISEASE JOURNEY TIMELINES]\n' + JSON.stringify(copilotContext.journeys, null, 2) + '\n';
+      }
+    }
 
+    const prompt = `You are a precise medical assistant chatbot and Physician Copilot.
+Your goal is to answer the physician's or patient's questions about their medical records.
+
+CRITICAL SAFETY RULE: You are not a doctor. You must NEVER formulate clinical diagnoses, suggest treatments, prescribe medications, or state causation of symptoms. Keep all explanations strictly objective.
+CRITICAL EVIDENCE RULE: Answer the question ONLY based on the provided document text chunks, patient memory, lab panels, medication switches, and structured medical records below. Do not assume or invent details.
+If the context does not contain evidence to answer the question, or if a user asks about a condition not documented in their records (e.g., "Do I have kidney disease?"), you MUST reply:
+"I couldn't find a verified record documenting [condition] in the records currently available." (replace [condition] with the disease or concern they asked about).
+
+Patient Compact Memory:
+${compressedMemory || 'No patient compact memory available.'}
+
+Context - Lab Panels, Journeys, and Medication Switches:
+${copilotContextString || 'No longitudinal copilot intelligence available.'}
 
 Context - Uploaded Document Text Chunks:
 ${chunkContext || 'No raw document text available.'}

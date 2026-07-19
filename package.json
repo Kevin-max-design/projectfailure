@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "ocr:setup": "python3 -m venv services/ocr/.venv && services/ocr/.venv/bin/pip install -r services/ocr/requirements.txt",
+    "ocr:start": "services/ocr/.venv/bin/uvicorn app:app --app-dir services/ocr --host 127.0.0.1 --port 8001",
+    "test:unit": "npx tsc -p tsconfig.json --noEmit false --outDir tests/dist --module commonjs --moduleResolution node && node tests/dist/tests/unit-tests.js",
+    "test:real": "npx tsc tests/real_app_validation.ts --outDir tests/dist --module commonjs --moduleResolution node --esModuleInterop && node tests/dist/real_app_validation.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
@@ -32,6 +36,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",

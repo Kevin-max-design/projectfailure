@@ -68,7 +68,7 @@ class MockDatabase {
           const date = ext.documentDate.value || doc.date;
 
           // Diagnoses
-          ext.diagnoses.forEach((dx, i) => {
+          ext.diagnoses?.forEach((dx: any, i: number) => {
             const recordId = `rec-dx-${doc.id}-${i}`;
             records.push({
               id: recordId,
@@ -109,7 +109,7 @@ class MockDatabase {
           });
 
           // Medications
-          ext.medications.forEach((med, i) => {
+          ext.medications?.forEach((med: any, i: number) => {
             const recordId = `rec-med-${doc.id}-${i}`;
             records.push({
               id: recordId,
@@ -157,7 +157,7 @@ class MockDatabase {
           });
 
           // Lab Results
-          ext.labResults.forEach((lab, i) => {
+          ext.labResults?.forEach((lab: any, i: number) => {
             const recordId = `rec-lab-${doc.id}-${i}`;
             records.push({
               id: recordId,
@@ -200,7 +200,7 @@ class MockDatabase {
           });
 
           // Procedures
-          ext.procedures.forEach((proc, i) => {
+          ext.procedures?.forEach((proc: any, i: number) => {
             const recordId = `rec-proc-${doc.id}-${i}`;
             records.push({
               id: recordId,

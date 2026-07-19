@@ -16,7 +16,9 @@ export interface QuestionAnsweringProvider {
     question: string,
     patientId: string,
     contextChunks: { text: string; documentId: string; documentTitle: string; pageNumber: number; date: string }[],
-    structuredRecords: any[]
+    structuredRecords: any[],
+    compressedMemory?: string,
+    copilotContext?: any
   ): Promise<QAAnswer>;
 }
 
@@ -25,7 +27,9 @@ export class DemoQuestionAnsweringProvider implements QuestionAnsweringProvider 
     question: string,
     patientId: string,
     contextChunks: { text: string; documentId: string; documentTitle: string; pageNumber: number; date: string }[],
-    structuredRecords: any[]
+    structuredRecords: any[],
+    compressedMemory?: string,
+    copilotContext?: any
   ): Promise<QAAnswer> {
     await new Promise((resolve) => setTimeout(resolve, 1500));
 

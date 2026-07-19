@@ -29,6 +29,7 @@ export default function DocumentDetailPage() {
   const docId = params.id as string;
 
   const [document, setDocument] = useState<any>(null);
+  const [extraction, setExtraction] = useState<any>(null);
   const [diagnoses, setDiagnoses] = useState<any[]>([]);
   const [medications, setMedications] = useState<any[]>([]);
   const [labResults, setLabResults] = useState<any[]>([]);
@@ -48,6 +49,19 @@ export default function DocumentDetailPage() {
         return;
       }
       setDocument(docRes.data);
+
+      const mockExtraction = {
+        documentType: docRes.data.category || 'Discharge Summary',
+        documentTitle: { value: docRes.data.file_name, confidence: 0.98, sourceText: docRes.data.file_name, page: 1 },
+        documentDate: { value: '2026-05-12', confidence: 0.95, sourceText: 'Date of Discharge: 12 May 2026', page: 1 },
+        hospitalName: { value: 'Apollo Hospital', confidence: 0.99, sourceText: 'APOLLO HEALTH CITY', page: 1 },
+        doctorName: { value: 'Dr. Ramesh Kumar', confidence: 0.94, sourceText: 'Consultant: Dr. Ramesh Kumar', page: 1 },
+        encounterDetails: {
+          hospitalName: { value: 'Apollo Hospital', confidence: 0.99, sourceText: 'APOLLO HEALTH CITY', page: 1 },
+          doctorName: { value: 'Dr. Ramesh Kumar', confidence: 0.94, sourceText: 'Consultant: Dr. Ramesh Kumar', page: 1 }
+        }
+      };
+      setExtraction(mockExtraction);
 
       const dxRes = mockDb.query('diagnoses').select().eq('source_document_id', docId);
       setDiagnoses(dxRes.data || []);
@@ -70,6 +84,7 @@ export default function DocumentDetailPage() {
 
         const data = await response.json();
         setDocument(data.document);
+        setExtraction(data.extraction);
 
         // Fetch related entities from Supabase via client client
         const { createClient } = await import('@/lib/supabase/client');
@@ -289,12 +304,12 @@ export default function DocumentDetailPage() {
             <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-3">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">AI Extraction Integrity</h4>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Confidence Score</span>
+                <span className="text-xs text-slate-650 dark:text-slate-300 font-medium">Confidence Score</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                   confidenceCategory === 'HIGH' ? 'bg-teal-50 text-teal-700 dark:bg-teal-950/20 dark:text-teal-400' :
                   confidenceCategory === 'MEDIUM' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/20' : 'bg-red-50 text-red-700'
                 }`}>
-                  {confidenceCategory} (~{Math.round(averageConfidence * 100)}%)
+                  {confidenceCategory === 'HIGH' ? 'High confidence' : confidenceCategory === 'MEDIUM' ? 'Needs review' : 'Low confidence'}
                 </span>
               </div>
             </div>
@@ -316,7 +331,7 @@ export default function DocumentDetailPage() {
                   <div>
                     <span className="text-[10px] text-slate-400 block font-semibold">Document Date</span>
                     <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {document.created_at ? formatDate(createdAt) : 'Under Review'}
+                      {extraction?.documentDate?.value || (createdAt ? formatDate(createdAt) : 'Under Review')}
                     </span>
                   </div>
                 </div>
@@ -326,7 +341,7 @@ export default function DocumentDetailPage() {
                   <div>
                     <span className="text-[10px] text-slate-400 block font-semibold">Hospital/Clinic Name</span>
                     <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {document.category === 'Discharge Summary' ? 'Apollo Hospital' : 'MedMemory Diagnostics'}
+                      {extraction?.encounterDetails?.hospitalName?.value || extraction?.hospitalName?.value || 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -336,7 +351,7 @@ export default function DocumentDetailPage() {
                   <div>
                     <span className="text-[10px] text-slate-400 block font-semibold">Attending Practitioner</span>
                     <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {document.category === 'Discharge Summary' ? 'Dr. Ramesh Kumar' : 'Dr. Arjun Rao'}
+                      {extraction?.encounterDetails?.doctorName?.value || extraction?.doctorName?.value || 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -345,7 +360,9 @@ export default function DocumentDetailPage() {
                   <FileText className="h-4 w-4 text-slate-450" />
                   <div>
                     <span className="text-[10px] text-slate-400 block font-semibold">Classification Category</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{document.category}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {document.category || extraction?.documentType || 'N/A'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -438,6 +455,322 @@ export default function DocumentDetailPage() {
                   {labResults.length === 0 && <p className="text-xs text-slate-400 italic">No lab results extracted.</p>}
                 </div>
               </div>
+
+              {/* Patient Profile on Document */}
+              {extraction?.patientDetails && (extraction?.patientDetails?.patientNameOnDocument?.value || extraction?.patientDetails?.age?.value || extraction?.patientDetails?.gender?.value || extraction?.patientDetails?.patientIdOrMrn?.value) && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Patient Profile on Document</h4>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                    {extraction.patientDetails.patientNameOnDocument?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Name</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{extraction.patientDetails.patientNameOnDocument.value}</span>
+                      </div>
+                    )}
+                    {extraction.patientDetails.age?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Age</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{extraction.patientDetails.age.value}</span>
+                      </div>
+                    )}
+                    {extraction.patientDetails.gender?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Gender</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{extraction.patientDetails.gender.value}</span>
+                      </div>
+                    )}
+                    {extraction.patientDetails.patientIdOrMrn?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">MRN / Patient ID</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{extraction.patientDetails.patientIdOrMrn.value}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Chief Complaints & Symptoms */}
+              {((extraction?.clinicalInformation?.chiefComplaints && extraction.clinicalInformation.chiefComplaints.length > 0) || (extraction?.clinicalInformation?.presentingSymptoms && extraction.clinicalInformation.presentingSymptoms.length > 0)) && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Chief Complaints & Symptoms</h4>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl space-y-2 text-xs">
+                    {extraction.clinicalInformation.chiefComplaints && extraction.clinicalInformation.chiefComplaints.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold mb-1">Chief Complaints</span>
+                        <ul className="list-disc pl-4 space-y-1">
+                          {extraction.clinicalInformation.chiefComplaints.map((cc: any, idx: number) => (
+                            <li key={idx} className="text-slate-700 dark:text-slate-300 font-semibold">{cc.value}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {extraction.clinicalInformation.presentingSymptoms && extraction.clinicalInformation.presentingSymptoms.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold mb-1">Presenting Symptoms</span>
+                        <ul className="list-disc pl-4 space-y-1">
+                          {extraction.clinicalInformation.presentingSymptoms.map((ps: any, idx: number) => (
+                            <li key={idx} className="text-slate-700 dark:text-slate-300">{ps.value}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Clinical History */}
+              {(extraction?.clinicalInformation?.historyOfPresentIllness?.value || extraction?.clinicalInformation?.pastMedicalHistory?.value || extraction?.clinicalInformation?.familyHistory?.value || (extraction?.clinicalInformation?.comorbidities && extraction.clinicalInformation.comorbidities.length > 0)) && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Clinical History</h4>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl space-y-3 text-xs">
+                    {extraction.clinicalInformation.historyOfPresentIllness?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">History of Present Illness (HPI)</span>
+                        <p className="text-slate-750 dark:text-slate-300 leading-relaxed font-medium">{extraction.clinicalInformation.historyOfPresentIllness.value}</p>
+                      </div>
+                    )}
+                    {extraction.clinicalInformation.pastMedicalHistory?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Past Medical History</span>
+                        <p className="text-slate-755 dark:text-slate-350 leading-relaxed">{extraction.clinicalInformation.pastMedicalHistory.value}</p>
+                      </div>
+                    )}
+                    {extraction.clinicalInformation.familyHistory?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Family History</span>
+                        <p className="text-slate-755 dark:text-slate-350 leading-relaxed">{extraction.clinicalInformation.familyHistory.value}</p>
+                      </div>
+                    )}
+                    {extraction.clinicalInformation.comorbidities && extraction.clinicalInformation.comorbidities.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold mb-1">Comorbidities</span>
+                        <ul className="list-disc pl-4 space-y-1">
+                          {extraction.clinicalInformation.comorbidities.map((cm: any, idx: number) => (
+                            <li key={idx} className="text-slate-700 dark:text-slate-300">{cm.value}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Vitals & Physical Examination */}
+              {(extraction?.examination?.vitals || extraction?.examination?.generalExamination?.value || extraction?.examination?.systemicExamination?.value || extraction?.examination?.clinicalFindings?.value) && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Vitals & Examination</h4>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl space-y-3 text-xs">
+                    {extraction.examination.vitals && (
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        {extraction.examination.vitals.bp?.value && (
+                          <div className="p-2 bg-white dark:bg-slate-900 border border-slate-100 rounded-lg">
+                            <span className="text-[9px] text-slate-400 block">BP</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{extraction.examination.vitals.bp.value}</span>
+                          </div>
+                        )}
+                        {extraction.examination.vitals.hr?.value && (
+                          <div className="p-2 bg-white dark:bg-slate-900 border border-slate-100 rounded-lg">
+                            <span className="text-[9px] text-slate-400 block">Heart Rate</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{extraction.examination.vitals.hr.value}</span>
+                          </div>
+                        )}
+                        {extraction.examination.vitals.temp?.value && (
+                          <div className="p-2 bg-white dark:bg-slate-900 border border-slate-100 rounded-lg">
+                            <span className="text-[9px] text-slate-400 block">Temp</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{extraction.examination.vitals.temp.value}</span>
+                          </div>
+                        )}
+                        {extraction.examination.vitals.rr?.value && (
+                          <div className="p-2 bg-white dark:bg-slate-900 border border-slate-100 rounded-lg">
+                            <span className="text-[9px] text-slate-400 block">Resp Rate</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{extraction.examination.vitals.rr.value}</span>
+                          </div>
+                        )}
+                        {extraction.examination.vitals.spo2?.value && (
+                          <div className="p-2 bg-white dark:bg-slate-900 border border-slate-100 rounded-lg">
+                            <span className="text-[9px] text-slate-400 block">SpO2</span>
+                            <span className="font-bold text-slate-800 dark:text-teal-405">{extraction.examination.vitals.spo2.value}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {extraction.examination.generalExamination?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">General Physical Exam</span>
+                        <p className="text-slate-750 dark:text-slate-350">{extraction.examination.generalExamination.value}</p>
+                      </div>
+                    )}
+                    {extraction.examination.clinicalFindings?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Clinical Findings</span>
+                        <p className="text-slate-750 dark:text-slate-300">{extraction.examination.clinicalFindings.value}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Imaging & Diagnostic Studies */}
+              {extraction?.investigations?.imaging && extraction.investigations.imaging.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Imaging Reports / Studies</h4>
+                  <div className="space-y-3">
+                    {extraction.investigations.imaging.map((img: any, i: number) => (
+                      <div key={i} className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl space-y-1 text-xs">
+                        <h5 className="font-bold text-slate-800 dark:text-slate-200">{img.studyName}</h5>
+                        {img.findings && (
+                          <p className="text-slate-705 dark:text-slate-350"><span className="text-[10px] text-slate-400 font-semibold block">Findings</span> {img.findings}</p>
+                        )}
+                        {img.impression && (
+                          <p className="text-slate-705 dark:text-slate-300 font-medium"><span className="text-[10px] text-slate-400 font-semibold block">Impression</span> {img.impression}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Procedures Snapshot */}
+              {procedures.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Extracted Procedures & Surgeries</h4>
+                  <div className="space-y-3">
+                    {procedures.map((proc, i) => (
+                      <div key={i} className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl text-xs space-y-1">
+                        <h5 className="font-bold text-slate-850 dark:text-slate-200">{proc.name} {proc.date ? `(${proc.date})` : ''}</h5>
+                        {proc.surgeon_name && <p className="text-slate-500">Surgeon: {proc.surgeon_name}</p>}
+                        {proc.notes && <p className="text-slate-650 dark:text-slate-350">{proc.notes}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Treatment snaps / hospital course */}
+              {(extraction?.treatment?.treatmentGiven?.value || extraction?.treatment?.hospitalCourse?.value) && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Treatment during admission & Course</h4>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl space-y-2 text-xs">
+                    {extraction.treatment.treatmentGiven?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Treatment Administered</span>
+                        <p className="text-slate-700 dark:text-slate-300">{extraction.treatment.treatmentGiven.value}</p>
+                      </div>
+                    )}
+                    {extraction.treatment.hospitalCourse?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Hospital Course Details</span>
+                        <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{extraction.treatment.hospitalCourse.value}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Discharge Advice & Plan */}
+              {(extraction?.dischargePlan?.dietaryAdvice?.value || extraction?.dischargePlan?.activityAdvice?.value || extraction?.dischargePlan?.nextVisit?.value || (extraction?.dischargePlan?.referrals && extraction.dischargePlan.referrals.length > 0) || (extraction?.dischargePlan?.warningSigns && extraction.dischargePlan.warningSigns.length > 0)) && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Advice & Follow-up</h4>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl space-y-3 text-xs">
+                    {extraction.dischargePlan.dietaryAdvice?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Dietary Advice</span>
+                        <p className="text-slate-750 dark:text-slate-300 font-medium">{extraction.dischargePlan.dietaryAdvice.value}</p>
+                      </div>
+                    )}
+                    {extraction.dischargePlan.activityAdvice?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Activity Instructions</span>
+                        <p className="text-slate-750 dark:text-slate-350">{extraction.dischargePlan.activityAdvice.value}</p>
+                      </div>
+                    )}
+                    {extraction.dischargePlan.nextVisit?.value && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold">Next Appointment</span>
+                        <p className="text-slate-750 dark:text-slate-300 font-semibold">{extraction.dischargePlan.nextVisit.value}</p>
+                      </div>
+                    )}
+                    {extraction.dischargePlan.referrals && extraction.dischargePlan.referrals.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold mb-1">Referrals</span>
+                        <ul className="list-disc pl-4 space-y-1">
+                          {extraction.dischargePlan.referrals.map((ref: any, idx: number) => (
+                            <li key={idx} className="text-slate-700 dark:text-slate-300">{ref.value}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {extraction.dischargePlan.warningSigns && extraction.dischargePlan.warningSigns.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-red-500 block font-bold mb-1">Warning Signs to Watch Out</span>
+                        <ul className="list-disc pl-4 space-y-1 text-red-655 dark:text-red-400">
+                          {extraction.dischargePlan.warningSigns.map((ws: any, idx: number) => (
+                            <li key={idx} className="font-semibold">{ws.value}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Allergies & Other Notes */}
+              {((extraction?.allergies && extraction.allergies.length > 0) || (extraction?.notes && extraction.notes.length > 0)) && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Allergies & Notes</h4>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl space-y-2 text-xs">
+                    {extraction.allergies && extraction.allergies.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-bold mb-1 text-amber-600">Allergies</span>
+                        <ul className="list-disc pl-4 space-y-1 text-amber-700 dark:text-amber-400 font-semibold">
+                          {extraction.allergies.map((all: any, idx: number) => (
+                            <li key={idx}>{all.value}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {extraction.notes && extraction.notes.length > 0 && (
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-semibold mb-1">Additional Notes</span>
+                        <ul className="list-disc pl-4 space-y-1">
+                          {extraction.notes.map((n: any, idx: number) => (
+                            <li key={idx} className="text-slate-750 dark:text-slate-300">{n.value}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Unmapped / Other Documented Information */}
+              {extraction?.unmappedDocumentedInformation && extraction.unmappedDocumentedInformation.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Other Documented Information (Unmapped)</h4>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl text-xs space-y-2 max-h-[300px] overflow-y-auto">
+                    {extraction.unmappedDocumentedInformation.map((item: any, idx: number) => (
+                      <div key={idx} className="border-b border-slate-100 dark:border-slate-800 pb-2 last:border-0 last:pb-0">
+                        <span className="text-[9px] text-slate-400 font-bold block">{item.sectionHeading || 'Unstructured Content'} (Page {item.page || 1})</span>
+                        <p className="text-slate-750 dark:text-slate-350 italic mt-0.5">"{item.text}"</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Unreadable Sections */}
+              {extraction?.unreadableSections && extraction.unreadableSections.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-450 uppercase tracking-wider mb-3">Unreadable / Uncertain Sections</h4>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl text-xs space-y-1 text-amber-800 dark:text-amber-400">
+                    <ul className="list-disc pl-4 space-y-1 font-semibold">
+                      {extraction.unreadableSections.map((item: any, idx: number) => (
+                        <li key={idx}>{item.description} (Page {item.page || 1})</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
 
             </div>
 
