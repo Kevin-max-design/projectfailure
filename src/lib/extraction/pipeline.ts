@@ -7,6 +7,11 @@ import { DocumentClassifier } from './classifier';
 import { SpecializedExtractors } from './extractors';
 import { DeterministicValidator } from './validator';
 
+// Ontology hybrid intelligence imports
+import { DeterministicMedicalClassifier } from '../medical/classifier/deterministic-classifier';
+import { OntologyExtractors } from '../medical/extractor/ontology-extractors';
+import { OntologyValidators } from '../medical/validator/ontology-validators';
+
 export interface PipelineOptions {
   demoMode?: boolean;
 }
@@ -17,6 +22,11 @@ export class DocumentProcessingPipeline {
   private classifier: DocumentClassifier;
   private extractors: SpecializedExtractors;
   private validator: DeterministicValidator;
+  
+  // New ontology components
+  private deterministicClassifier: DeterministicMedicalClassifier;
+  private ontologyExtractors: OntologyExtractors;
+  private ontologyValidators: OntologyValidators;
 
   constructor(options?: PipelineOptions) {
     this.ocrProvider = createOCRProvider();
@@ -24,6 +34,11 @@ export class DocumentProcessingPipeline {
     this.classifier = new DocumentClassifier();
     this.extractors = new SpecializedExtractors();
     this.validator = new DeterministicValidator();
+    
+    // New ontology components
+    this.deterministicClassifier = new DeterministicMedicalClassifier();
+    this.ontologyExtractors = new OntologyExtractors();
+    this.ontologyValidators = new OntologyValidators();
   }
 
   public getExtractionMethod(): string {
@@ -261,35 +276,31 @@ export class DocumentProcessingPipeline {
       // STAGE B: Structured Medical Extraction (Classifier & Specialized Extractors & Validator)
       await this.updateStatus(supabase, documentId, 'extracting');
       
-      // 1. Classification & Context Understanding
-      const classification = await this.classifier.classifyDocument(ocrResult.rawText, category);
-      console.log(`Document classified as: ${classification.documentType} (Confidence: ${classification.confidenceScore})`);
-
+      // 1. Classification & Context Understanding using Deterministic Medical Classifier
+      const classification = this.deterministicClassifier.classify(ocrResult.rawText);
+      console.log(`Deterministic Ontology Classification: ${classification.documentType} (Confidence: ${classification.confidenceScore})`);
+      
       let extraction: MedicalExtraction;
-      if (classification.documentType === 'NEEDS_REVIEW') {
-        extraction = {
-          documentType: 'OTHER_MEDICAL_DOCUMENT',
-          classificationConfidence: classification.confidenceScore,
-          classificationSource: 'llm',
-          documentTitle: { value: 'Needs Review', confidence: classification.confidenceScore, sourceText: classification.explanation, page: 1 },
-          documentDate: { value: null, confidence: 1.0, sourceText: null, page: 1 }
-        } as any;
-      } else {
-        // 2. Call specialized extractor
-        const extractedData = await this.extractors.extract(ocrResult.rawText, classification.documentType);
-        
-        // Merge patient/encounter details detected by classifier if not extracted
-        extraction = {
-          documentType: classification.documentType,
-          classificationConfidence: classification.confidenceScore,
-          classificationSource: 'llm',
-          documentTitle: { value: classification.documentType.replace(/_/g, ' '), confidence: classification.confidenceScore, sourceText: classification.explanation, page: 1 },
-          documentDate: { value: null, confidence: 1.0, sourceText: null, page: 1 },
-          patientNameOnDocument: classification.patientName ? { value: classification.patientName, confidence: 0.95, sourceText: classification.patientName, page: 1 } : undefined,
-          hospitalName: classification.hospitalName ? { value: classification.hospitalName, confidence: 0.95, sourceText: classification.hospitalName, page: 1 } : undefined,
-          ...extractedData
-        } as any;
-      }
+      
+      // 2. Call specialized extractor
+      const extractedData = await this.ontologyExtractors.extract(ocrResult.rawText, classification);
+      
+      // Merge patient/encounter details detected by classifier if not extracted
+      extraction = {
+        documentType: classification.documentType === 'Other' ? 'OTHER_MEDICAL_DOCUMENT' : classification.documentType,
+        classificationConfidence: classification.confidenceScore,
+        classificationSource: classification.confidenceScore >= 0.80 ? 'ontology' : 'llm',
+        documentTitle: { 
+          value: classification.documentType === 'Other' ? 'Medical Document' : classification.documentType.replace(/_/g, ' '), 
+          confidence: classification.confidenceScore, 
+          sourceText: classification.explanation, 
+          page: 1 
+        },
+        documentDate: { value: null, confidence: 1.0, sourceText: null, page: 1 },
+        patientNameOnDocument: classification.patientName ? { value: classification.patientName, confidence: 0.95, sourceText: classification.patientName, page: 1 } : undefined,
+        hospitalName: classification.hospitalName ? { value: classification.hospitalName, confidence: 0.95, sourceText: classification.hospitalName, page: 1 } : undefined,
+        ...extractedData
+      } as any;
 
       // Fetch patient profile for validation
       let patientProfile = null;
@@ -302,21 +313,21 @@ export class DocumentProcessingPipeline {
         patientProfile = data;
       }
 
-      // 3. Deterministic Validation
-      const validationResult = this.validator.validate(extraction, patientProfile);
+      // 3. Ontology Validation
+      const validationResult = this.ontologyValidators.validate(extraction, classification.documentType);
       extraction = validationResult.validatedExtraction;
 
       // Save validation errors and classification info
       await supabase
         .from('documents')
         .update({
-          document_type: classification.documentType === 'NEEDS_REVIEW' ? null : classification.documentType,
+          document_type: classification.documentType === 'Other' ? null : classification.documentType,
           classification_confidence: classification.confidenceScore,
-          classification_source: 'llm',
+          classification_source: classification.confidenceScore >= 0.80 ? 'ontology' : 'llm',
           metadata: {
             validationErrors: validationResult.errors,
-            classificationReasoning: classification.explanation,
-            sectionsDetected: classification.sections
+            classificationReasoning: classification.reason,
+            matchedEvidence: classification.matchedEvidence
           }
         })
         .eq('id', documentId);

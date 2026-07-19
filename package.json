@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "ocr:setup": "python3 -m venv services/ocr/.venv && services/ocr/.venv/bin/pip install -r services/ocr/requirements.txt",
+    "check-ollama": "node check_ollama.js",
+    "test:ontology": "npx ts-node --compiler-options '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' tests/ontology-tests.ts",
     "ocr:start": "services/ocr/.venv/bin/uvicorn app:app --app-dir services/ocr --host 127.0.0.1 --port 8001",
     "test:unit": "npx tsc -p tsconfig.json --noEmit false --outDir tests/dist --module commonjs --moduleResolution node && node tests/dist/tests/unit-tests.js",
     "test:real": "npx tsc tests/real_app_validation.ts --outDir tests/dist --module commonjs --moduleResolution node --esModuleInterop && node tests/dist/real_app_validation.js"
